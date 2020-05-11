@@ -188,20 +188,148 @@ In this section we use Qiime2 to deblur the joined reads, perform clustering usi
 		#singularity shell core_2019.4.sif
 #
 # Script Section
+# Example script for running using all replicated associated with all sites.
 	# CHANGE THESE
-	sample_dir=Boris_resubmit_seperate_sites/
-	replicate=P1
-	replicate_fastq = ${sample_dir}/fastq_${replicate}/
+	sample_dir=Boris/
+	fastq_dir = ${sample_dir}/fastq/
 	
 	#
 	#Define directory
 	base_dir=/scratch/ps163/qiime2/
-	input_dir=${base_dir}/${sample_dir}/output_${replicate}
+	input_dir=${base_dir}/${sample_dir}/output
 	mapping_file=${input_dir}/MappingFile_mangue.csv
 	#
 	qiime tools import \
 	--type 'SampleData[SequencesWithQuality]' \
-	--input-path ${replicate_fastq} \
+	--input-path ${fastq_dir} \
+	--input-format CasavaOneEightSingleLanePerSampleDirFmt \
+	--output-path ${input_dir}/demux-joined.qza
+	  
+	qiime dada2 denoise-single \
+	 --i-demultiplexed-seqs ${input_dir}/demux-joined.qza \
+	 --p-trim-left 3 \
+	 --p-trunc-len 0 \
+	 --o-representative-sequences ${input_dir}/pre-otu-rep-seqs-dada2.qza \
+	 --o-table ${input_dir}/pre-otu-table-dada2.qza \
+	 --o-denoising-stats ${input_dir}/stats-dada2.qza
+	  
+	qiime metadata tabulate \
+	  --m-input-file ${input_dir}/stats-dada2.qza \
+	  --o-visualization ${input_dir}/stats-dada2.qzv
+	  
+	#07.10.19: changed 'i-reference-sequences' to an unaligned format. vsearch does not support aligned reference sequences.
+	qiime vsearch cluster-features-open-reference \
+	  --i-table ${input_dir}/pre-otu-table-dada2.qza \
+	  --i-sequences ${input_dir}/pre-otu-rep-seqs-dada2.qza \
+	  --i-reference-sequences /scratch/ps163/qiime2/feature_classifier/silva_132_97_16S.qza \
+	  --p-perc-identity 0.97 \
+	  --o-clustered-table ${input_dir}table-dada2.qza \
+	  --o-clustered-sequences ${input_dir}rep-seqs-dada2.qza \
+	  --o-new-reference-sequences ${input_dir}new-ref-seqs-or-97.qza
+	  
+	qiime feature-table summarize \
+	  --i-table ${input_dir}/table-dada2.qza \
+	  --o-visualization ${input_dir}feature_table.qzv \
+	  --m-sample-metadata-file ${mapping_file}
+	  
+	qiime feature-table tabulate-seqs \
+	  --i-data ${input_dir}/rep-seqs-dada2.qza \
+	  --o-visualization ${input_dir}dada2-rep-seqs.qzv
+	  
+	  #Phylogeny
+	qiime phylogeny align-to-tree-mafft-fasttree \
+	  --i-sequences ${input_dir}/rep-seqs-dada2.qza \
+	  --o-alignment ${input_dir}/aligned-rep-seqs.qza \
+	  --o-masked-alignment ${input_dir}/masked-aligned-rep-seqs.qza \
+	  --o-tree ${input_dir}/unrooted-tree.qza \
+	  --o-rooted-tree ${input_dir}/rooted-tree.qza
+	  
+	#to view trees 
+	qiime tools export \
+	  --input-path ${input_dir}/unrooted-tree.qza \
+	  --output-path ${input_dir}/exported-unrooted-tree
+	  
+	#to view trees 
+	qiime tools export \
+	  --input-path ${input_dir}/rooted-tree.qza \
+	  --output-path ${input_dir}/exported-rooted-tree
+	  
+	  #rarefac. 	11301
+	 # #re  _x_ sampling_depth == 9340
+	 # Core diversity analysis
+	qiime diversity core-metrics-phylogenetic \
+	  --i-phylogeny ${input_dir}/rooted-tree.qza \
+	  --i-table ${input_dir}/table-dada2.qza \
+	  --p-sampling-depth 9340 \
+	  --m-metadata-file ${mapping_file} \
+	  --output-dir ${input_dir}core-metrics-results
+	  
+	#Do not proceed group significance tests below. Go to Alpha raref.
+	qiime diversity alpha-group-significance \
+	  --i-alpha-diversity ${input_dir}/core-metrics-results/faith_pd_vector.qza \
+	  --m-metadata-file ${mapping_file} \
+	  --o-visualization ${input_dir}/core-metrics-results/faith-pd-group-significance.qzv
+
+	qiime diversity alpha-group-significance \
+	  --i-alpha-diversity ${input_dir}/core-metrics-results/evenness_vector.qza \
+	  --m-metadata-file ${mapping_file} \
+	  --o-visualization ${input_dir}/core-metrics-results/evenness-group-significance.qzv
+	
+	#07.11.19 - Changed metadata-column to "Site" instead of "InputFileName", the latter generated an error "All values in the grouping vector are unique". 
+	qiime diversity beta-group-significance \
+	  --i-distance-matrix  ${input_dir}/core-metrics-results/weighted_unifrac_distance_matrix.qza \
+	  --m-metadata-file ${mapping_file} \
+	  --m-metadata-column Site \
+	  --o-visualization ${input_dir}/core-metrics-results/weighted-unifrac-site-significance.qzv \
+	  --p-pairwise
+	  
+	#07.11.19 - Changed metadata-column to "Site" instead of "InputFileName", the latter generated an error "All values in the grouping vector are unique". 
+	qiime diversity beta-group-significance \
+	  --i-distance-matrix  ${input_dir}/core-metrics-results/unweighted_unifrac_distance_matrix.qza \
+	  --m-metadata-file ${mapping_file} \
+	  --m-metadata-column Site \
+	  --o-visualization ${input_dir}/core-metrics-results/unweighted-unifrac-site-significance.qzv \
+	  --p-pairwise
+	  
+	#Alpha raref.
+	qiime diversity alpha-rarefaction \
+	  --i-table ${input_dir}/table-dada2.qza \
+	  --i-phylogeny ${input_dir}/rooted-tree.qza \
+	  --p-max-depth 17000 \
+	  --m-metadata-file ${mapping_file} \
+	  --o-visualization ${input_dir}/core-metrics-results/alpha-rarefaction.qzv
+	  
+	  #taxonomy
+	qiime feature-classifier classify-sklearn \
+	  --i-classifier /scratch/ps163/qiime2/silva-132-99-515-806-nb-scikit0.20-classifier.qza \
+	  --i-reads ${input_dir}/rep-seqs-dada2.qza \
+	  --o-classification ${input_dir}/taxonomy.qza
+	 
+	qiime metadata tabulate \
+	  --m-input-file ${input_dir}/taxonomy.qza \
+	  --o-visualization ${input_dir}/taxonomy.qzv
+	  
+	qiime taxa barplot \
+	  --i-table ${input_dir}/table-dada2.qza \
+	  --i-taxonomy ${input_dir}/taxonomy.qza \
+	  --m-metadata-file ${mapping_file} \
+	  --o-visualization ${input_dir}/taxa-bar-plots.qzv
+	  
+# Example script for using all replicates of a single site, allowing for analysis of sites separately.
+	# CHANGE THESE
+	sample_dir=Boris_resubmit_seperate_sites/
+	site=P1
+	site_fastq = ${sample_dir}/fastq_${site}/
+	
+	#
+	#Define directory
+	base_dir=/scratch/ps163/qiime2/
+	input_dir=${base_dir}/${sample_dir}/output_${site}
+	mapping_file=${input_dir}/MappingFile_mangue.csv
+	#
+	qiime tools import \
+	--type 'SampleData[SequencesWithQuality]' \
+	--input-path ${site_fastq} \
 	--input-format CasavaOneEightSingleLanePerSampleDirFmt \
 	--output-path ${input_dir}/demux-joined.qza
 	  
