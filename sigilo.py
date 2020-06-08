@@ -131,8 +131,8 @@ def go_master_heatmap(ko_master_dict):
     ko_list = []
     value_array = []
     
-    for ko in ko_master_dict.items():
-        data=ko_master_dict[ko]
+    for ko, data in ko_master_dict.items():
+        #data=ko_master_dict[ko]
         print(ko, data)
         value_array.append(data)
         ko_line = ('{}: {}').format(ko, ko_dict[ko])
