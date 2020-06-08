@@ -123,7 +123,7 @@ def go_master_heatmap(ko_master_dict):
     global max_value
     global ko_dict
     
-    heatmap_name = ('{}_median_heatmap.pdf').format(args.output_file)
+    heatmap_name = ('{}_master_heatmap.pdf').format(args.output_file)
     
     title_is = ('Heatmap of Significant KOs').format()
 
