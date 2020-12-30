@@ -1,0 +1,1 @@
+python novembro.py -f feature-table.biom.txt -t taxonomy.tsv -s silva -o taxa_counts.tab

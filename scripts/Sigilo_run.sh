@@ -1,0 +1,3 @@
+python scripts/sigilo.py --generate_heatmap -i picrust2_out_pipeline/KO_metagenome_out/pred_metagenome_unstrat.tsv -sig Aldex_results/aldex_significant_all_glm.ep_KO.csv -k metadata/ko00001.keg -o sigilo_results/
+python scripts/sigilo.py --asv2fa -level 4 -select novembro_results_2/site_specific_family_enrichment.tab -c picrust2_out_pipeline/KO_metagenome_out/pred_metagenome_contrib.tsv -t qiime_results/taxonomy.tsv -k metadata/ko00001.keg -o sigilo_results_2/asv2fa.tab
+python scripts/sigilo.py --asv2nsti -level 4 -select novembro_results_2/site_specific_family_enrichment.tab -n picrust2_out_pipeline/marker_predicted_and_nsti.tsv -t qiime_results/taxonomy.tsv -o sigilo_results_2/asv2nsti.tab
